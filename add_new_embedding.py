@@ -19,3 +19,5 @@ def add_new_embedding(image_path, person_name, embedding_db_path):
     face_image = cv2.imread(image_path)
     embedding = get_embeddings(face_image)
     save_embeddings(person_name, embedding, embedding_db_path)
+
+# add_new_embedding('shivam.png', 'Shivam', 'face_embeddings.json')

@@ -8,8 +8,8 @@ def cosine_similarity(embedding1, embedding2):
 
     norm1 = np.linalg.norm(embedding1)
     norm2 = np.linalg.norm(embedding2)
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
+    if norm1 == 0 or norm2 == 0: return 0.0
+    
     similarity = np.dot(embedding1, embedding2) / (norm1 * norm2)
     return similarity
 
@@ -33,6 +33,7 @@ def find_best_match(test_embedding, embedding_db_path):
 def test_from_path(image_path, embedding_db_path):
     image = cv2.imread(image_path)
     embedding = get_embeddings(image)
+    if embedding is None: return None
     return find_best_match(embedding, embedding_db_path)
 
 def test_from_image(image, embedding_db_path):
