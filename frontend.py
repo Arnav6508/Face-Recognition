@@ -6,7 +6,7 @@ from PIL import Image, ImageTk
 from add_new_embedding import add_new_embedding_from_image
 from test import test_from_image
 
-db = 'test.json'
+db = 'test.db'
 
 class App():
     def __init__(self):

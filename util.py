@@ -3,20 +3,12 @@ import cv2
 from facenet_pytorch import InceptionResnetV1
 from ultralytics import YOLO
 import tensorflow as tf
-import json
 import torch
+import sqlite3
 
 model_path = 'best.pt'
-
 model = YOLO(model_path)
 base_model = InceptionResnetV1(pretrained='vggface2').eval()
-
-def load_embeddings(embedding_db_path):
-    try:
-        with open(embedding_db_path, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
 
 def preprocess(image):
     img = cv2.resize(image, (160,160)) 
@@ -40,3 +32,37 @@ def get_embeddings(image):
             return embedding.detach().numpy()
     
     return None
+
+def initialize_db(embedding_db_path):
+    conn = sqlite3.connect(embedding_db_path)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Embeddings(
+                name TEXT,
+                embedding BLOB
+            )
+        '''
+        )
+    conn.commit()
+    conn.close()
+
+def save_embeddings(person_name, embedding, embedding_db_path):
+
+    initialize_db(embedding_db_path)
+
+    conn = sqlite3.connect(embedding_db_path)
+    cursor = conn.cursor()
+
+    # check if name already exists
+    cursor.execute('SELECT name FROM Embeddings WHERE name = ?',(person_name,))
+    is_name_present = cursor.fetchone()
+    if is_name_present: 
+        conn.close()
+        return False
+
+    # insert new entry
+    embedding_blob = np.array(embedding).astype(np.float32).tobytes()
+    cursor.execute('INSERT INTO Embeddings (name, embedding) VALUES(?,?)',(person_name,embedding_blob))
+    conn.commit()
+    conn.close()
