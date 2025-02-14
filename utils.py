@@ -38,15 +38,16 @@ def initialize_db(embedding_db_path):
 
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Embeddings(
-                name TEXT,
-                embedding BLOB
+                person_id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                embedding BLOB NOT NULL
             )
         '''
         )
     conn.commit()
     conn.close()
 
-def save_embeddings(person_name, embedding, embedding_db_path):
+def save_embeddings(person_id, person_name, embedding, embedding_db_path):
 
     initialize_db(embedding_db_path)
 
@@ -54,15 +55,16 @@ def save_embeddings(person_name, embedding, embedding_db_path):
     cursor = conn.cursor()
 
     # check if name already exists
-    cursor.execute('SELECT name FROM Embeddings WHERE name = ?',(person_name,))
+    cursor.execute('SELECT name FROM Embeddings WHERE person_id = ?',(person_id,))
     is_name_present = cursor.fetchone()
     if is_name_present: 
+        cursor.execute('UPDATE Embeddings SET name = ?, embedding = ? WHERE person_id = ?', (person_name, embedding, person_id))
         conn.close()
-        return False
+        return 
 
     # insert new entry
     embedding_blob = np.array(embedding).astype(np.float32).tobytes()
-    cursor.execute('INSERT INTO Embeddings (name, embedding) VALUES(?,?)',(person_name,embedding_blob))
+    cursor.execute('INSERT INTO Embeddings (person_id, name, embedding) VALUES(?,?,?)',(person_id, person_name, embedding_blob))
     conn.commit()
     conn.close()
 
@@ -89,21 +91,71 @@ def find_best_match(test_embedding, embedding_db_path):
 
     for entry in embeddings_db:
 
-        name, embedding_blob = entry
+        per_id, name, embedding_blob = entry
         stored_embedding = np.frombuffer(embedding_blob, dtype=np.float32)
         similarity = cosine_similarity(test_embedding, stored_embedding)  
 
         if similarity > best_similarity:  
             best_similarity = similarity
             best_match_name = name
+            best_match_id = per_id
     
     print(best_match_name)
-    return best_match_name
+    return best_match_id, best_match_name
 
-def add_new_embedding_from_path(image_path, person_name, embedding_db_path):
+def add_new_embedding_from_path(image_path, person_id, person_name, embedding_db_path):
     image = cv2.imread(image_path)
-    add_new_embedding_from_image(image, person_name, embedding_db_path)
+    add_new_embedding_from_image(image, person_id, person_name, embedding_db_path)
 
-def add_new_embedding_from_image(image, person_name, embedding_db_path):
+def add_new_embedding_from_image(image, person_id, person_name, embedding_db_path):
     embedding = get_embeddings(image)
-    save_embeddings(person_name, embedding, embedding_db_path)
+    save_embeddings(person_id, person_name, embedding, embedding_db_path)
+
+def initialize_attendance_db(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Attendance(
+                person_id INTEGER,
+                name TEXT NOT NULL,
+                date DATE NOT NULL,
+                time TIME NOT NULL,
+                FOREIGN KEY (person_id) REFERENCES Embeddings(id)
+            )
+        '''
+        )
+    conn.commit()
+    conn.close()
+
+def mark_attendance(person_id, name, date, time, db_path):
+
+    initialize_attendance_db(db_path)
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute('INSERT into Attendance (person_id, name, date, time) VALUES(?, ?, ?, ?)', (person_id, name, date, time))
+
+    conn.commit()
+    conn.close()
+
+def print_attendance_record(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * from Attendance')
+    records = cursor.fetchall()
+    for record in records: print(record)
+
+    conn.commit()
+    conn.close()
+
+def delete_attendance_record(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute('DELETE from Attendance')
+
+    conn.commit()
+    conn.close()
